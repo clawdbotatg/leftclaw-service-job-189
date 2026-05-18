@@ -1,83 +1,34 @@
-# 🏗 Scaffold-ETH 2
+# LeftClaw Services — Live Dashboard
 
-<h4 align="center">
-  <a href="https://docs.scaffoldeth.io">Documentation</a> |
-  <a href="https://scaffoldeth.io">Website</a>
-</h4>
+A public, read-only dashboard showing live onchain metrics for LeftClaw Services.
 
-🧪 An open-source, up-to-date toolkit for building decentralized applications (dapps) on the Ethereum blockchain. It's designed to make it easier for developers to create and deploy smart contracts and build user interfaces that interact with those contracts.
+## Live Dashboard
 
-> [!NOTE]
-> 🤖 Scaffold-ETH 2 is AI-ready! It has everything agents need to build on Ethereum. Check `.agents/`, `.claude/`, `.opencode` or `.cursor/` for more info.
+**[https://bafybeidio2c7zbz2ysvwg5nzfrqchawpputbf2jzhvs4ee7luawxq77bqe.ipfs.community.bgipfs.com/](https://bafybeidio2c7zbz2ysvwg5nzfrqchawpputbf2jzhvs4ee7luawxq77bqe.ipfs.community.bgipfs.com/)**
 
-⚙️ Built using NextJS, RainbowKit, Foundry, Wagmi, Viem, and Typescript.
+## What it shows
 
-- ✅ **Contract Hot Reload**: Your frontend auto-adapts to your smart contract as you edit it.
-- 🪝 **[Custom hooks](https://docs.scaffoldeth.io/hooks/)**: Collection of React hooks wrapper around [wagmi](https://wagmi.sh/) to simplify interactions with smart contracts with typescript autocompletion.
-- 🧱 [**Components**](https://docs.scaffoldeth.io/components/): Collection of common web3 components to quickly build your frontend.
-- 🔥 **Burner Wallet & Local Faucet**: Quickly test your application with a burner wallet and local faucet.
-- 🔐 **Integration with Wallet Providers**: Connect to different wallet providers and interact with the Ethereum network.
+- **Total completed jobs** — count of all jobs with status=COMPLETE
+- **Total CLAWD burned** — sum of all CLAWD tokens paid across completed jobs
+- **Total revenue volume** — sum of all USD-denominated pricing for completed jobs
+- **Full jobs table** — sorted newest first, with service type, CLAWD burned, revenue, date, and result link
 
-![Debug Contracts tab](https://github.com/scaffold-eth/scaffold-eth-2/assets/55535804/b237af0c-5027-4849-a5c1-2e31495cccb1)
+## Architecture
 
-## Requirements
+Pure static HTML/JS — no server, no backend, no API keys required.
 
-Before you begin, you need to install the following tools:
+- Data pulled from the Base blockchain (chain 8453) via public RPC
+- Contract: [`0xb2fb486a9569ad2c97d9c73936b46ef7fdaa413a`](https://basescan.org/address/0xb2fb486a9569ad2c97d9c73936b46ef7fdaa413a)
+- Multicall3 batches all `getJob()` calls into 1-2 RPC requests
+- Deployed to BGIPFS (decentralized, censorship-resistant)
 
-- [Node (>= v20.18.3)](https://nodejs.org/en/download/)
-- Yarn ([v1](https://classic.yarnpkg.com/en/docs/install/) or [v2+](https://yarnpkg.com/getting-started/install))
-- [Git](https://git-scm.com/downloads)
+## Tech stack
 
-## Quickstart
+- ethers.js v6 (CDN) — blockchain reads
+- Multicall3 (`0xcA11bde05977b3631167028862bE2a173976CA11`) — batch contract calls
+- Tailwind CSS (CDN) — styling
+- Public Base RPC (`https://mainnet.base.org`) — no API key needed
 
-To get started with Scaffold-ETH 2, follow the steps below:
+## Local development
 
-1. Install dependencies if it was skipped in CLI:
-
-```
-cd my-dapp-example
-yarn install
-```
-
-2. Run a local network in the first terminal:
-
-```
-yarn chain
-```
-
-This command starts a local Ethereum network using Foundry. The network runs on your local machine and can be used for testing and development. You can customize the network configuration in `packages/foundry/foundry.toml`.
-
-3. On a second terminal, deploy the test contract:
-
-```
-yarn deploy
-```
-
-This command deploys a test smart contract to the local network. The contract is located in `packages/foundry/contracts` and can be modified to suit your needs. The `yarn deploy` command uses the deploy script located in `packages/foundry/script` to deploy the contract to the network. You can also customize the deploy script.
-
-4. On a third terminal, start your NextJS app:
-
-```
-yarn start
-```
-
-Visit your app on: `http://localhost:3000`. You can interact with your smart contract using the `Debug Contracts` page. You can tweak the app config in `packages/nextjs/scaffold.config.ts`.
-
-Run smart contract test with `yarn foundry:test`
-
-- Edit your smart contracts in `packages/foundry/contracts`
-- Edit your frontend homepage at `packages/nextjs/app/page.tsx`. For guidance on [routing](https://nextjs.org/docs/app/building-your-application/routing/defining-routes) and configuring [pages/layouts](https://nextjs.org/docs/app/building-your-application/routing/pages-and-layouts) checkout the Next.js documentation.
-- Edit your deployment scripts in `packages/foundry/script`
-
-
-## Documentation
-
-Visit our [docs](https://docs.scaffoldeth.io) to learn how to start building with Scaffold-ETH 2.
-
-To know more about its features, check out our [website](https://scaffoldeth.io).
-
-## Contributing to Scaffold-ETH 2
-
-We welcome contributions to Scaffold-ETH 2!
-
-Please see [CONTRIBUTING.MD](https://github.com/scaffold-eth/scaffold-eth-2/blob/main/CONTRIBUTING.md) for more information and guidelines for contributing to Scaffold-ETH 2.
+Open `index.html` directly in any browser — no build step required.
