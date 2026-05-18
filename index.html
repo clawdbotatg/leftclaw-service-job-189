@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LeftClaw Services — Live Dashboard</title>
+  <meta name="description" content="Live onchain metrics for LeftClaw Services — completed jobs, CLAWD burned, and revenue volume from the Base blockchain." />
+  <meta property="og:title" content="LeftClaw Services — Live Dashboard" />
+  <meta property="og:description" content="Live onchain metrics for LeftClaw Services — completed jobs, CLAWD burned, and revenue volume from the Base blockchain." />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.13.4/ethers.umd.min.js"></script>
+  <style>
+    body { background: #0a0a0a; font-family: system-ui, -apple-system, sans-serif; }
+    .mono { font-family: 'JetBrains Mono', 'Fira Code', monospace; }
+    .card { background: #111; border: 1px solid #222; }
+    .accent { color: #ff4500; }
+    .table-row:hover { background: #161616; }
+    .spinner {
+      width: 40px; height: 40px;
+      border: 3px solid #222;
+      border-top-color: #ff4500;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .fade-in { animation: fadeIn 0.4s ease-in; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+    .stat-num { font-size: 2rem; font-weight: 700; line-height: 1.2; }
+    thead th { position: sticky; top: 0; background: #111; z-index: 10; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #111; }
+    ::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #444; }
+  </style>
+</head>
+<body class="min-h-screen text-gray-100">
+
+  <!-- Header -->
+  <header class="border-b border-gray-800 px-6 py-4">
+    <div class="max-w-7xl mx-auto flex items-center justify-between flex-wrap gap-3">
+      <div class="flex items-center gap-3">
+        <span class="text-3xl">🦞</span>
+        <div>
+          <h1 class="text-xl font-bold text-white leading-tight">LeftClaw Services — Live Dashboard</h1>
+          <p class="text-xs text-gray-500">Onchain metrics from Base blockchain · updated on every page load</p>
+        </div>
+      </div>
+      <a href="https://leftclaw.services" target="_blank" rel="noopener noreferrer"
+         class="text-sm text-gray-400 hover:text-orange-400 transition-colors border border-gray-700 hover:border-orange-500 rounded px-3 py-1.5 mono">
+        leftclaw.services ↗
+      </a>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-4 py-8">
+
+    <!-- Loading state -->
+    <div id="loading" class="flex flex-col items-center justify-center py-24 gap-4">
+      <div class="spinner"></div>
+      <p class="text-gray-500 text-sm mono" id="loading-text">Connecting to Base blockchain…</p>
+    </div>
+
+    <!-- Error state -->
+    <div id="error-state" class="hidden flex flex-col items-center justify-center py-24 gap-4">
+      <div class="text-4xl">⚠️</div>
+      <p class="text-red-400 text-lg font-semibold">Failed to load data</p>
+      <p class="text-gray-500 text-sm mono" id="error-msg"></p>
+      <button onclick="loadData()"
+        class="mt-2 px-6 py-2 rounded border border-orange-600 text-orange-400 hover:bg-orange-950 transition-colors mono text-sm">
+        ↺ Retry
+      </button>
+    </div>
+
+    <!-- Dashboard content -->
+    <div id="dashboard" class="hidden fade-in">
+
+      <!-- Stats row -->
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+        <div class="card rounded-xl p-6">
+          <p class="text-gray-500 text-xs mono uppercase tracking-wider mb-2">Completed Jobs</p>
+          <p class="stat-num text-white mono" id="stat-jobs">—</p>
+        </div>
+        <div class="card rounded-xl p-6">
+          <p class="text-gray-500 text-xs mono uppercase tracking-wider mb-2">Total CLAWD Burned</p>
+          <p class="stat-num accent mono" id="stat-clawd">—</p>
+          <p class="text-gray-600 text-xs mono mt-1">CLAWD token (18 dec)</p>
+        </div>
+        <div class="card rounded-xl p-6">
+          <p class="text-gray-500 text-xs mono uppercase tracking-wider mb-2">Total Revenue Volume</p>
+          <p class="stat-num text-green-400 mono" id="stat-revenue">—</p>
+          <p class="text-gray-600 text-xs mono mt-1">USD value at time of payment</p>
+        </div>
+      </div>
+
+      <!-- Jobs table -->
+      <div class="card rounded-xl overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-800 flex items-center justify-between">
+          <h2 class="text-sm font-semibold text-gray-300 mono uppercase tracking-wider">Completed Jobs</h2>
+          <span class="text-xs text-gray-600 mono" id="table-count"></span>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="border-b border-gray-800 text-gray-500 text-xs mono">
+                <th class="text-left px-6 py-3 font-medium">Job ID</th>
+                <th class="text-left px-6 py-3 font-medium">Service</th>
+                <th class="text-right px-6 py-3 font-medium">CLAWD Burned</th>
+                <th class="text-right px-6 py-3 font-medium">Revenue</th>
+                <th class="text-left px-6 py-3 font-medium">Completed</th>
+                <th class="text-left px-6 py-3 font-medium">Result</th>
+              </tr>
+            </thead>
+            <tbody id="jobs-tbody" class="divide-y divide-gray-900">
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div class="mt-8 text-center text-xs text-gray-700 mono">
+        <p>Contract: <a href="https://basescan.org/address/0xb2fb486a9569ad2c97d9c73936b46ef7fdaa413a" target="_blank"
+           class="hover:text-gray-500 transition-colors">0xb2fb486a9569ad2c97d9c73936b46ef7fdaa413a</a> · Base (chain 8453)</p>
+        <p class="mt-1">Data read directly from blockchain via public Base RPC</p>
+      </div>
+
+    </div>
+  </main>
+
+  <script>
+    const CONTRACT = "0xb2fb486a9569ad2c97d9c73936b46ef7fdaa413a";
+    const MULTICALL3 = "0xcA11bde05977b3631167028862bE2a173976CA11";
+    const RPC_URL = "https://mainnet.base.org";
+
+    const SERVICE_NAMES = {
+      1: "Quick Consult",
+      2: "Deep Consult",
+      3: "PFP",
+      4: "Contract Audit",
+      5: "Frontend QA",
+      6: "Build",
+      7: "Research",
+      8: "Judge/Oracle",
+      9: "HumanQA",
+    };
+
+    // Minimal ABI fragments
+    const CONTRACT_ABI = [
+      "function getJobsByStatus(uint8 status) view returns (uint256[])",
+      "function getJob(uint256 jobId) view returns (tuple(uint256 id, address client, uint256 serviceTypeId, uint256 paymentClawd, uint256 priceUsd, string description, uint8 status, uint256 createdAt, uint256 startedAt, uint256 completedAt, string resultCID, address worker, bool paymentClaimed, uint8 paymentMethod, uint256 cvAmount, string currentStage))"
+    ];
+
+    const MULTICALL3_ABI = [
+      "function aggregate3(tuple(address target, bool allowFailure, bytes callData)[] calls) view returns (tuple(bool success, bytes returnData)[])"
+    ];
+
+    function setLoading(msg) {
+      document.getElementById("loading-text").textContent = msg;
+    }
+
+    function showError(msg) {
+      document.getElementById("loading").classList.add("hidden");
+      document.getElementById("error-state").classList.remove("hidden");
+      document.getElementById("dashboard").classList.add("hidden");
+      document.getElementById("error-msg").textContent = msg;
+    }
+
+    function showDashboard() {
+      document.getElementById("loading").classList.add("hidden");
+      document.getElementById("error-state").classList.add("hidden");
+      document.getElementById("dashboard").classList.remove("hidden");
+    }
+
+    function formatClawd(bigintVal) {
+      // 18 decimals
+      const val = Number(bigintVal) / 1e18;
+      return val.toLocaleString("en-US", { maximumFractionDigits: 0 });
+    }
+
+    function formatUsd(bigintVal) {
+      // 6 decimals (micro-USDC)
+      const val = Number(bigintVal) / 1e6;
+      return val.toLocaleString("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function formatDate(timestamp) {
+      if (!timestamp || timestamp === 0n) return "—";
+      const d = new Date(Number(timestamp) * 1000);
+      return d.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+    }
+
+    function truncAddr(addr) {
+      if (!addr) return "—";
+      return addr.slice(0, 6) + "…" + addr.slice(-4);
+    }
+
+    async function loadData() {
+      // Reset UI
+      document.getElementById("loading").classList.remove("hidden");
+      document.getElementById("error-state").classList.add("hidden");
+      document.getElementById("dashboard").classList.add("hidden");
+
+      try {
+        setLoading("Connecting to Base blockchain…");
+        const provider = new ethers.JsonRpcProvider(RPC_URL);
+        const contract = new ethers.Contract(CONTRACT, CONTRACT_ABI, provider);
+        const multicall = new ethers.Contract(MULTICALL3, MULTICALL3_ABI, provider);
+        const iface = new ethers.Interface(CONTRACT_ABI);
+
+        setLoading("Fetching completed job IDs…");
+        const completedIds = await contract.getJobsByStatus(2);
+        const ids = [...completedIds].sort((a, b) => (b > a ? 1 : b < a ? -1 : 0)); // newest first (highest ID first)
+
+        setLoading(`Fetching ${ids.length} completed jobs via multicall…`);
+
+        // Encode getJob calls for multicall
+        const getJobCalldata = (id) => iface.encodeFunctionData("getJob", [id]);
+
+        // Batch into chunks of 100 to avoid response size limits
+        const CHUNK = 100;
+        const allJobs = [];
+        for (let i = 0; i < ids.length; i += CHUNK) {
+          const chunk = ids.slice(i, i + CHUNK);
+          const calls = chunk.map(id => ({
+            target: CONTRACT,
+            allowFailure: true,
+            callData: getJobCalldata(id)
+          }));
+          setLoading(`Loading jobs ${i + 1}–${Math.min(i + CHUNK, ids.length)} of ${ids.length}…`);
+          const results = await multicall.aggregate3(calls);
+          for (let j = 0; j < results.length; j++) {
+            const [success, data] = results[j];
+            if (success && data && data !== "0x") {
+              try {
+                const decoded = iface.decodeFunctionResult("getJob", data);
+                allJobs.push(decoded[0]);
+              } catch (e) {
+                // skip failed decode
+              }
+            }
+          }
+        }
+
+        // Compute stats
+        let totalClawd = 0n;
+        let totalUsd = 0n;
+        for (const job of allJobs) {
+          totalClawd += BigInt(job.paymentClawd);
+          totalUsd += BigInt(job.priceUsd);
+        }
+
+        // Update stats
+        document.getElementById("stat-jobs").textContent = allJobs.length.toLocaleString("en-US");
+        document.getElementById("stat-clawd").textContent = formatClawd(totalClawd) + " CLAWD";
+        document.getElementById("stat-revenue").textContent = formatUsd(totalUsd);
+        document.getElementById("table-count").textContent = `${allJobs.length} jobs`;
+
+        // Build table rows (already sorted newest first by ID)
+        const tbody = document.getElementById("jobs-tbody");
+        tbody.innerHTML = "";
+        for (const job of allJobs) {
+          const svcName = SERVICE_NAMES[Number(job.serviceTypeId)] || `Type ${job.serviceTypeId}`;
+          const clawdBurned = Number(job.paymentMethod) === 0
+            ? `<span class="accent">${formatClawd(job.paymentClawd)}</span>`
+            : `<span class="text-gray-600">—</span>`;
+          const revenue = formatUsd(job.priceUsd);
+          const completedDate = formatDate(job.completedAt);
+          const resultCID = job.resultCID || "";
+          const resultLink = resultCID.startsWith("https://")
+            ? `<a href="${resultCID}" target="_blank" rel="noopener noreferrer" class="text-blue-400 hover:text-blue-300 transition-colors mono">View ↗</a>`
+            : `<span class="text-gray-700">—</span>`;
+
+          const jobId = Number(job.id);
+          const jobLink = resultCID.startsWith("https://")
+            ? `<a href="${resultCID}" target="_blank" rel="noopener noreferrer" class="accent hover:text-orange-300 transition-colors mono font-semibold">#${jobId}</a>`
+            : `<span class="text-gray-400 mono font-semibold">#${jobId}</span>`;
+
+          const tr = document.createElement("tr");
+          tr.className = "table-row transition-colors";
+          tr.innerHTML = `
+            <td class="px-6 py-3">${jobLink}</td>
+            <td class="px-6 py-3 text-gray-300">${svcName}</td>
+            <td class="px-6 py-3 text-right mono text-sm">${clawdBurned}</td>
+            <td class="px-6 py-3 text-right mono text-green-400 text-sm">${revenue}</td>
+            <td class="px-6 py-3 text-gray-400 text-xs mono">${completedDate}</td>
+            <td class="px-6 py-3">${resultLink}</td>
+          `;
+          tbody.appendChild(tr);
+        }
+
+        showDashboard();
+      } catch (err) {
+        console.error(err);
+        showError(err.message || "Unknown error connecting to blockchain");
+      }
+    }
+
+    // Start loading on page load
+    loadData();
+  </script>
+
+</body>
+</html>
